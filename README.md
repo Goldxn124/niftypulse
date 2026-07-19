@@ -55,6 +55,16 @@ cannot fire — reports say so), news scan, intraday 15-minute mode, scheduled r
 (§5 — pair `run.py` with Task Scheduler or a Claude Code scheduled task), and the
 weekly scorecard rollup over `ledger.json`.
 
+## Measured performance (read this before trading anything)
+
+`python backtest.py` replays the live rules walk-forward. Result for Jul 2024 – Jul 2026
+(641 trades, 0.1%/side costs): **40.1% win rate, −0.15R average, profit factor 0.73** —
+following every signal with the spec's money rules would have lost ~24% while NIFTY was
+flat. The signal engine, as currently tuned, has **no demonstrated edge**; treat the
+dashboard as an educational/structuring tool, not a money-maker. Any rule change should
+be re-validated with `backtest.py` before deployment (tune on one year, confirm on the
+other, distrust anything that only works on the year it was tuned on).
+
 ## Constituent snapshot note
 
 The bundled fallback list was verified 2026-07-19: Sept-2025 rebalance applied
