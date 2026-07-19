@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: "50 3 * * 1-5"
   workflow_dispatch: {}   # manual "Run workflow" button in the Actions tab
+  push:
+    branches: [main]      # every code update redeploys the site
 
 permissions:
   contents: read
