@@ -31,6 +31,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python build_static.py
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true   # first run creates/enables the Pages site itself
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
