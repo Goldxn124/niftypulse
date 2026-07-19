@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+reports/
+ledger.json
+logs/
+site/
+scan_output.txt
+scan_log.txt

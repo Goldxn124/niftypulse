@@ -1,0 +1,38 @@
+name: morning-scan
+
+# Rebuilds the dashboard with fresh market data and redeploys GitHub Pages.
+# 03:50 UTC = 09:20 IST, five minutes after NSE opens, Monday-Friday.
+# (GitHub cron can drift a few minutes under load - normal and harmless.)
+on:
+  schedule:
+    - cron: "50 3 * * 1-5"
+  workflow_dispatch: {}   # manual "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python build_static.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NiftyPulse — NIFTY 50 signal dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;          /* sequential blue — confidence meter */
+    --good: #0ca30c;            /* status: BUY */
+    --good-text: #006300;
+    --warning: #fab219;         /* status: caution notes */
+    --serious: #ec835a;         /* status: bearish regime */
+    --critical: #d03b3b;        /* status: SELL */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --good-text: #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 0 20px 40px; }
+  header.top {
+    max-width: 1080px; margin: 0 auto; padding: 22px 20px 6px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between;
+  }
+  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  .sub { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+  .top-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #asof { color: var(--muted); font-size: 13px; }
+  button.primary {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.55; cursor: wait; }
+  section { margin-top: 22px; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .hint { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
+
+  /* regime banner */
+  .banner {
+    border: 1px solid var(--border); border-left-width: 5px; border-radius: 10px;
+    background: var(--surface); padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .banner .icon { font-size: 20px; line-height: 1.2; }
+  .banner b { display: block; margin-bottom: 2px; }
+  .banner p { margin: 0; color: var(--ink-2); font-size: 14px; }
+  .banner .stats { margin-top: 6px; color: var(--muted); font-size: 13px; }
+
+  /* learn box */
+  details.learn {
+    margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  }
+  details.learn summary {
+    cursor: pointer; padding: 12px 16px; font-weight: 600; list-style: none;
+  }
+  details.learn summary::before { content: "▸ "; color: var(--accent); }
+  details.learn[open] summary::before { content: "▾ "; }
+  .glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; padding: 0 16px 16px; }
+  .glossary div { font-size: 13.5px; color: var(--ink-2); }
+  .glossary b { color: var(--ink); display: block; margin-bottom: 2px; }
+  .rules { grid-column: 1 / -1; border-top: 1px dashed var(--grid); padding-top: 12px; }
+  .rules b { color: var(--ink); }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .label { font-size: 12.5px; color: var(--ink-2); }
+  .tile .value { font-size: 26px; font-weight: 650; margin-top: 2px; }
+  .tile .delta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .delta.up { color: var(--good-text); }
+  .delta.down { color: var(--critical); }
+
+  /* signal cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .sym { font-size: 17px; font-weight: 700; }
+  .card .price { color: var(--ink-2); font-size: 14px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; padding: 3px 10px; letter-spacing: 0.02em;
+  }
+  .chip.buy  { color: #fff; background: var(--good); }
+  .chip.sell { color: #fff; background: var(--critical); }
+  .chip.hold { color: var(--ink-2); background: transparent; border: 1px solid var(--grid); }
+  .conf { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; }
+  .conf .label { font-size: 12.5px; color: var(--ink-2); min-width: 92px; }
+  .meter { flex: 1; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  .conf .num { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); min-width: 44px; text-align: right; }
+  .plan { margin: 10px 0 0; border-top: 1px dashed var(--grid); padding-top: 10px; display: grid; gap: 6px; font-size: 14px; }
+  .plan .row { display: flex; justify-content: space-between; gap: 10px; }
+  .plan .k { color: var(--ink-2); }
+  .plan .v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  .plan .v small { font-weight: 400; color: var(--muted); }
+  .trigger { margin-top: 10px; font-size: 13px; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 8px; padding: 8px 10px; }
+  .why { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+  .why li { margin-top: 3px; }
+  .why li::before { content: "✓ "; color: var(--good-text); }
+  .why li.risk::before { content: "⚠ "; color: var(--warning); }
+  .cardnote { margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+  .cardnote::before { content: "⚠ "; color: var(--warning); }
+
+  /* filters + table */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
+  .fchip {
+    border: 1px solid var(--grid); background: var(--surface); color: var(--ink-2);
+    border-radius: 999px; padding: 5px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .fchip.active { border-color: var(--accent); color: var(--ink); font-weight: 600; }
+  #search {
+    margin-left: auto; border: 1px solid var(--grid); border-radius: 8px; background: var(--surface);
+    color: var(--ink); font: inherit; font-size: 13.5px; padding: 6px 10px; min-width: 180px;
+  }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 700px; font-size: 14px; }
+  th {
+    text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--grid);
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  th .arrow { font-size: 10px; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  td .meter { width: 70px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+  td .confnum { font-variant-numeric: tabular-nums; }
+  td.level { color: var(--ink-2); font-size: 13px; white-space: nowrap; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--ink-2); }
+  .empty h2 { font-size: 20px; }
+  #status { font-size: 13px; color: var(--ink-2); min-height: 18px; margin-top: 8px; }
+  footer {
+    max-width: 1080px; margin: 30px auto 0; padding: 16px 20px 40px; color: var(--muted);
+    font-size: 12.5px; border-top: 1px solid var(--grid);
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>NiftyPulse</h1>
+    <p class="sub">NIFTY 50 signal scanner · educational tool — not investment advice</p>
+  </div>
+  <div class="top-right">
+    <span id="asof"></span>
+    <button class="primary" id="refreshBtn">↻ Run fresh scan</button>
+  </div>
+</header>
+
+<main>
+  <div id="status" role="status"></div>
+
+  <div id="empty" class="empty" hidden>
+    <h2>No scan yet</h2>
+    <p>Press <b>Run fresh scan</b> to fetch live NIFTY 50 data and build your first report.<br>It takes about a minute.</p>
+  </div>
+
+  <div id="dash" hidden>
+    <section id="banner"></section>
+
+    <details class="learn" id="learn">
+      <summary>New to stocks? How to read this page</summary>
+      <div class="glossary">
+        <div><b>Signal (stance)</b>The tool's overall read of each stock's chart. <b>BUY</b> = setup looks favourable. <b>HOLD</b> = no clear edge, do nothing. <b>SELL</b> = weak chart, avoid or exit.</div>
+        <div><b>Buy zone (entry)</b>The price range where buying has the best balance of risk and reward. If the price has already run above the zone, don't chase it.</div>
+        <div><b>Stop-loss</b>Your safety exit. If the price falls to this level, the idea has failed — sell and accept a small loss. Never trade without one.</div>
+        <div><b>Targets</b>Levels where the tool suggests booking profit — sell part at Target 1, the rest at Target 2.</div>
+        <div><b>Reward : risk</b>Potential gain vs. potential loss. 1:2 means risking ₹1 to potentially make ₹2. The tool rejects anything below 1:2.</div>
+        <div><b>Confidence</b>How much chart evidence supports the signal (0–100). It is <i>not</i> a probability of profit — 60 means "decent evidence", never "sure thing".</div>
+        <div class="rules"><b>Golden rules for beginners:</b> risk no more than 1% of your money on any single idea · always place the stop-loss the moment you buy · start tiny or paper-trade first · signals are computed from price history and can simply be wrong.</div>
+      </div>
+    </details>
+
+    <section class="tiles" id="tiles"></section>
+
+    <section>
+      <h2>Buy setups <span class="hint">complete plans that passed the 1:2 reward-to-risk test</span></h2>
+      <div class="cards" id="buyCards"></div>
+      <p class="cardnote">The tool does not check earnings dates or news yet — before acting on any setup, check if the company reports results soon (prices jump around results).</p>
+    </section>
+
+    <section id="sellSection" hidden>
+      <h2>Weak charts — avoid or exit <span class="hint">not short-selling advice; just charts in downtrends</span></h2>
+      <div class="cards" id="sellCards"></div>
+    </section>
+
+    <section>
+      <h2>All 50 stocks</h2>
+      <div class="controls" id="filters">
+        <button class="fchip active" data-f="ALL">All</button>
+        <button class="fchip" data-f="BUY">▲ Buy</button>
+        <button class="fchip" data-f="HOLD">– Hold</button>
+        <button class="fchip" data-f="SELL">▼ Sell</button>
+        <input id="search" type="search" placeholder="Search stock… e.g. TCS" aria-label="Search stock">
+      </div>
+      <div class="tablewrap">
+        <table id="tbl" aria-label="All NIFTY 50 signals">
+          <thead><tr>
+            <th data-k="symbol">Stock <span class="arrow"></span></th>
+            <th data-k="ltp">Price ₹ <span class="arrow"></span></th>
+            <th data-k="stance">Signal <span class="arrow"></span></th>
+            <th data-k="confidence">Confidence <span class="arrow"></span></th>
+            <th>What to watch</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer id="foot"></footer>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let DATA = null;
+let filter = "ALL";
+let sortKey = "confidence", sortDir = -1;
+
+const inr = (n) => n == null ? "n/a" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const pct = (from, to) => (100 * (to - from) / from);
+const fpct = (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+
+const REGIME_TEXT = {
+  bullish: { icon: "🟢", color: "var(--good)", title: "Market mood: Favourable",
+    body: "The NIFTY index is trading above its long-term trend. Normal conditions for considering buy setups — with stop-losses, always." },
+  neutral: { icon: "🟡", color: "var(--warning)", title: "Market mood: Mixed",
+    body: "The market is giving conflicting messages. Be selective and size positions small." },
+  bearish: { icon: "🟠", color: "var(--serious)", title: "Market mood: Cautious",
+    body: "The NIFTY index is below its long-term average (200-day trend). The tool automatically lowers its buy confidence and suggests half-sized positions. If you are brand new: this is a good period to watch and paper-trade rather than rush in." },
+};
+
+function stanceChip(st) {
+  if (st === "BUY") return '<span class="chip buy">▲ BUY</span>';
+  if (st === "SELL") return '<span class="chip sell">▼ SELL</span>';
+  return '<span class="chip hold">– HOLD</span>';
+}
+
+function meter(conf) {
+  return '<span class="meter" role="img" aria-label="confidence ' + conf + ' of 100"><i style="width:' + conf + '%"></i></span><span class="confnum">' + conf + '</span>';
+}
+
+function renderBanner(d) {
+  const r = d.regime, t = REGIME_TEXT[r.label] || REGIME_TEXT.neutral;
+  const vix = r.vix != null ? r.vix : "n/a";
+  $("banner").innerHTML =
+    '<div class="banner" style="border-left-color:' + t.color + '">' +
+      '<div class="icon">' + t.icon + '</div>' +
+      '<div><b>' + t.title + '</b><p>' + t.body + '</p>' +
+      '<div class="stats">NIFTY ' + inr(r.nifty_close) + ' vs 200-day average ' + inr(r.nifty_ema200) +
+      ' · India VIX (nervousness gauge): ' + vix + '</div></div></div>';
+}
+
+function renderTiles(d) {
+  const s = d.signals;
+  const buys = s.filter(x => x.stance === "BUY").length;
+  const sells = s.filter(x => x.stance === "SELL").length;
+  const holds = s.length - buys - sells;
+  const r = d.regime;
+  const dev = pct(r.nifty_ema200, r.nifty_close);
+  const devCls = dev >= 0 ? "up" : "down";
+  $("tiles").innerHTML =
+    tile("NIFTY 50 index", inr(r.nifty_close), '<span class="delta ' + devCls + '">' + fpct(dev) + ' vs 200-day avg</span>') +
+    tile("Buy setups", buys, "passed all quality checks") +
+    tile("Weak charts", sells, "avoid or exit") +
+    tile("No clear edge", holds, "HOLD — do nothing");
+}
+function tile(label, value, sub) {
+  return '<div class="tile"><div class="label">' + label + '</div><div class="value">' + value + '</div><div class="delta">' + (sub || "") + '</div></div>';
+}
+
+function planRow(k, v) { return '<div class="row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+
+function isPlumbingRisk(r) { return r.indexOf("calendar not wired") !== -1; }
+
+function buyCard(s) {
+  const mid = (s.entry_zone[0] + s.entry_zone[1]) / 2;
+  const stopP = fpct(pct(mid, s.stop_loss));
+  const t1P = fpct(pct(mid, s.targets[0]));
+  const t2P = fpct(pct(mid, s.targets[1]));
+  const why = s.evidence.map(e => "<li>" + e + "</li>").join("");
+  const risks = s.risks.filter(r => !isPlumbingRisk(r)).map(r => '<li class="risk">' + r + "</li>").join("");
+  return '<div class="card">' +
+    '<div class="head"><span class="sym">' + s.symbol + '</span>' + stanceChip(s.stance) + '</div>' +
+    '<div class="price">Last price ₹' + inr(s.ltp) + ' · ' + s.data_quality + '</div>' +
+    '<div class="conf"><span class="label">Confidence</span>' + meter(s.confidence) + '</div>' +
+    '<div class="plan">' +
+      planRow("Buy zone", "₹" + inr(s.entry_zone[0]) + " – ₹" + inr(s.entry_zone[1])) +
+      planRow("Stop-loss (safety exit)", "₹" + inr(s.stop_loss) + " <small>" + stopP + "</small>") +
+      planRow("Target 1", "₹" + inr(s.targets[0]) + " <small>" + t1P + "</small>") +
+      planRow("Target 2", "₹" + inr(s.targets[1]) + " <small>" + t2P + "</small>") +
+      planRow("Reward : risk", s.risk_reward.replace("1:", "1 : ")) +
+    '</div>' +
+    '<div class="trigger"><b>Plan:</b> ' + s.trigger + '</div>' +
+    '<ul class="why">' + why + risks + '</ul></div>';
+}
+
+function sellCard(s) {
+  const why = s.evidence.map(e => "<li>" + e + "</li>").join("");
+  return '<div class="card">' +
+    '<div class="head"><span class="sym">' + s.symbol + '</span>' + stanceChip(s.stance) + '</div>' +
+    '<div class="price">Last price ₹' + inr(s.ltp) + ' · ' + s.data_quality + '</div>' +
+    '<div class="conf"><span class="label">Chart strength</span>' + meter(s.confidence) + '</div>' +
+    (s.trigger ? '<div class="trigger"><b>Plan:</b> ' + s.trigger + '</div>' : "") +
+    '<ul class="why">' + why + '</ul></div>';
+}
+
+function watchText(s) {
+  if (s.stance === "BUY" && s.entry_zone) return "Buy zone ₹" + inr(s.entry_zone[0]) + " – ₹" + inr(s.entry_zone[1]);
+  if (s.stance === "SELL" && s.stop_loss) return "Reassess above ₹" + inr(s.stop_loss);
+  if (s.stance === "AVOID") return "No usable data";
+  return "No action suggested";
+}
+
+function renderTable() {
+  const q = $("search").value.trim().toUpperCase();
+  let rows = DATA.signals.slice();
+  if (filter !== "ALL") rows = rows.filter(s => s.stance === filter || (filter === "HOLD" && s.stance === "AVOID"));
+  if (q) rows = rows.filter(s => s.symbol.indexOf(q) !== -1);
+  rows.sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+  });
+  $("tbody").innerHTML = rows.map(s =>
+    "<tr><td><b>" + s.symbol + "</b></td>" +
+    '<td class="num">' + inr(s.ltp) + "</td>" +
+    "<td>" + stanceChip(s.stance) + "</td>" +
+    "<td>" + meter(s.confidence) + "</td>" +
+    '<td class="level">' + watchText(s) + "</td></tr>"
+  ).join("");
+  document.querySelectorAll("th[data-k]").forEach(th => {
+    th.querySelector(".arrow").textContent = th.dataset.k === sortKey ? (sortDir === 1 ? "▲" : "▼") : "";
+  });
+}
+
+function render(d) {
+  DATA = d;
+  $("empty").hidden = true;
+  $("dash").hidden = false;
+  const dt = new Date(d.generated_at);
+  const closed = d.signals.some(s => (s.data_quality || "").indexOf("closed") !== -1);
+  $("asof").textContent = "Last scan: " + dt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) +
+    (closed ? " · prices from last market close" : "");
+  renderBanner(d);
+  renderTiles(d);
+  const buys = d.signals.filter(s => s.stance === "BUY" && s.entry_zone);
+  $("buyCards").innerHTML = buys.length ? buys.map(buyCard).join("") :
+    '<p class="hint">No setups passed the quality bar in this scan — doing nothing is also a decision the tool respects.</p>';
+  const sells = d.signals.filter(s => s.stance === "SELL");
+  $("sellSection").hidden = sells.length === 0;
+  $("sellCards").innerHTML = sells.map(sellCard).join("");
+  renderTable();
+  $("foot").textContent = d.disclaimer + " · Data: Yahoo Finance / NSE (constituents: " + (d.universe_source || "n/a") + ").";
+}
+
+let MODE = "live";  // "static" when hosted on GitHub Pages (latest.json exists, no backend)
+
+async function load() {
+  try {
+    let r = await fetch("latest.json", { cache: "no-store" });
+    if (r.ok) {
+      MODE = "static";
+    } else {
+      r = await fetch("/api/latest");
+      if (r.status === 404) { $("empty").hidden = false; $("learn").open = true; return; }
+      if (!r.ok) throw new Error("HTTP " + r.status);
+    }
+    const d = await r.json();
+    render(d);
+    if (MODE === "static") {
+      $("refreshBtn").hidden = true;
+      $("asof").textContent += " · auto-updates every market morning";
+    } else {
+      maybeAutoRefresh(d);
+    }
+  } catch (e) {
+    $("status").textContent = "Could not load the last scan: " + e;
+  }
+}
+
+/* Live mode only: if the newest scan predates today's market open (09:15 IST)
+   and the market has opened, refresh automatically — "open it in the morning,
+   it updates itself". Best-effort; failures leave the last scan on screen. */
+function maybeAutoRefresh(d) {
+  try {
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const genIST = new Date(new Date(d.generated_at).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    if (nowIST.getDay() === 0 || nowIST.getDay() === 6) return;
+    const openToday = new Date(nowIST);
+    openToday.setHours(9, 20, 0, 0);
+    if (nowIST >= openToday && genIST < openToday) {
+      $("status").textContent = "Last scan is from before today's market open — refreshing automatically…";
+      refresh();
+    }
+  } catch (e) { /* never block the page over the convenience feature */ }
+}
+
+async function refresh() {
+  const btn = $("refreshBtn");
+  btn.disabled = true;
+  btn.textContent = "Scanning 50 stocks…";
+  $("status").textContent = "Fetching live data and recomputing every signal — takes about a minute.";
+  try {
+    const r = await fetch("/api/refresh", { method: "POST" });
+    if (r.status === 409) { $("status").textContent = "A scan is already running — give it a minute."; return; }
+    if (!r.ok) { $("status").textContent = "Scan failed (" + r.status + "). Data sources may be unreachable — try again shortly."; return; }
+    render(await r.json());
+    $("status").textContent = "Fresh scan complete.";
+    setTimeout(() => { $("status").textContent = ""; }, 4000);
+  } catch (e) {
+    $("status").textContent = "Scan failed: " + e;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "↻ Run fresh scan";
+  }
+}
+
+$("refreshBtn").addEventListener("click", refresh);
+$("search").addEventListener("input", renderTable);
+$("filters").addEventListener("click", (ev) => {
+  const b = ev.target.closest(".fchip");
+  if (!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll(".fchip").forEach(c => c.classList.toggle("active", c === b));
+  renderTable();
+});
+document.querySelectorAll("th[data-k]").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.k;
+  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = k === "symbol" ? 1 : -1; }
+  renderTable();
+}));
+
+load();
+</script>
+</body>
+</html>
